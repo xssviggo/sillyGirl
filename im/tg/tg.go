@@ -12,9 +12,10 @@ import (
 )
 
 type Sender struct {
-	Message *tb.Message
-	matches [][]string
-	chat    *core.Chat
+	Message  *tb.Message
+	matches  [][]string
+	Duration *time.Duration
+	deleted  bool
 }
 
 var tg = core.NewBucket("tg")
@@ -26,30 +27,32 @@ var Handler = func(message *tb.Message) {
 }
 
 func init() {
-	token := tg.Get("token")
-	if token == "" {
-		logs.Warn("未提供telegram机器人token")
-		return
-	}
-	var err error
-	b, err = tb.NewBot(tb.Settings{
-		Token:  token,
-		Poller: &tb.LongPoller{Timeout: 10 * time.Second},
-	})
+	go func() {
+		token := tg.Get("token")
+		if token == "" {
+			logs.Warn("未提供telegram机器人token")
+			return
+		}
+		var err error
+		b, err = tb.NewBot(tb.Settings{
+			Token:  token,
+			Poller: &tb.LongPoller{Timeout: 10 * time.Second},
+		})
 
-	if err != nil {
-		logs.Warn("监听telegram机器人失败：%v", err)
-		return
-	}
-	core.Pushs["tg"] = func(i int, s string) {
-		b.Send(&tb.User{ID: i}, s)
-	}
-	core.GroupPushs["tg"] = func(i, j int, s string) {
-		b.Send(&tb.Chat{ID: int64(i)}, s)
-	}
-	b.Handle(tb.OnText, Handler)
-	logs.Info("监听telegram机器人")
-	b.Start()
+		if err != nil {
+			logs.Warn("监听telegram机器人失败：%v", err)
+			return
+		}
+		core.Pushs["tg"] = func(i int, s string) {
+			b.Send(&tb.User{ID: i}, s)
+		}
+		core.GroupPushs["tg"] = func(i, j int, s string) {
+			b.Send(&tb.Chat{ID: int64(i)}, s)
+		}
+		b.Handle(tb.OnText, Handler)
+		logs.Info("监听telegram机器人")
+		b.Start()
+	}()
 }
 
 func (sender *Sender) GetContent() string {
@@ -130,45 +133,56 @@ func (sender *Sender) IsMedia() bool {
 	return false
 }
 
-func (sender *Sender) Reply(rt interface{}) error {
-	if sender.chat != nil {
-		sender.chat.Push(rt)
-		return nil
-	}
+func (sender *Sender) Reply(msgs ...interface{}) error {
+	msg := msgs[0]
+	var rt *tb.Message
 	var r tb.Recipient
 	var options = []interface{}{}
 	if !sender.Message.FromGroup() {
 		r = sender.Message.Sender
 	} else {
 		r = sender.Message.Chat
-		options = []interface{}{&tb.SendOptions{ReplyTo: sender.Message}}
+		if !sender.deleted {
+			options = []interface{}{&tb.SendOptions{ReplyTo: sender.Message}}
+		}
 	}
 	var err error
-	switch rt.(type) {
+	switch msg.(type) {
 	case error:
-		_, err = b.Send(r, fmt.Sprintf("%v", rt), options...)
+		rt, err = b.Send(r, fmt.Sprintf("%v", msg), options...)
 	case []byte:
-		_, err = b.Send(r, string(rt.([]byte)), options...)
+		rt, err = b.Send(r, string(msg.([]byte)), options...)
 	case string:
-		_, err = b.Send(r, rt.(string), options...)
+		rt, err = b.Send(r, msg.(string), options...)
 	case *http.Response:
-		_, err = b.SendAlbum(r, tb.Album{&tb.Photo{File: tb.FromReader(rt.(*http.Response).Body)}}, options...)
+		_, err = b.SendAlbum(r, tb.Album{&tb.Photo{File: tb.FromReader(msg.(*http.Response).Body)}}, options...)
 	}
 	if err != nil {
 		sender.Reply(err)
 	}
+	if rt != nil && sender.Duration != nil {
+		go func() {
+			time.Sleep(*sender.Duration)
+			sender.Delete()
+			b.Delete(rt)
+		}()
+	}
 	return err
 }
 
-func (sender *Sender) RecallGroupMessage() error {
-	cid := sender.GetChatID()
-	if cid == 0 {
+func (sender *Sender) Delete() error {
+	if sender.deleted {
 		return nil
 	}
-	sender.chat = &core.Chat{
-		Class:  sender.GetImType(),
-		ID:     sender.GetChatID(),
-		UserID: sender.GetUserID(),
+	msg := *sender.Message
+	sender.deleted = true
+	return b.Delete(&msg)
+}
+
+func (sender *Sender) Disappear(lifetime ...time.Duration) {
+	if len(lifetime) == 0 {
+		sender.Duration = &core.Duration
+	} else {
+		sender.Duration = &lifetime[0]
 	}
-	return b.Delete(sender.Message)
 }

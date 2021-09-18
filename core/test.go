@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"io/ioutil"
 	"strings"
 
 	"github.com/cdle/sillyGirl/im"
@@ -11,7 +12,8 @@ func initSys() {
 	AddCommand("", []Function{
 		{
 			Rules: []string{"raw ^name$"},
-			Handle: func(_ im.Sender) interface{} {
+			Handle: func(s im.Sender) interface{} {
+				s.Disappear()
 				return name()
 			},
 		},
@@ -19,15 +21,38 @@ func initSys() {
 			Rules: []string{"raw ^升级$"},
 			Admin: true,
 			Handle: func(s im.Sender) interface{} {
-				s.Reply(name() + "开始拉取代码。")
+				s.Disappear()
+				s.Reply(name() + "开始检查核心功能。")
+				update := false
+				record := func(b bool) {
+					if !update && b {
+						update = true
+					}
+				}
 				need, err := GitPull("")
 				if err != nil {
 					return err
 				}
 				if !need {
-					return name() + "已是最新版。"
+					record(need)
+					s.Reply(name() + "核心功能已是最新。")
 				}
-				s.Reply(name() + "开始拉取成功。")
+				files, _ := ioutil.ReadDir(ExecPath + "/develop")
+				for _, f := range files {
+					if f.IsDir() {
+						need, err := GitPull("/develop/" + f.Name())
+						if err != nil {
+							s.Reply(name() + "扩展" + f.Name() + "更新错误" + err.Error() + "。")
+						}
+						if !need {
+							record(need)
+							s.Reply(name() + "扩展" + f.Name() + "已是最新。")
+						}
+					}
+				}
+				if !need {
+					return name() + "没有更新。"
+				}
 				s.Reply(name() + "正在编译程序。")
 				if err := CompileCode(); err != nil {
 					return err
@@ -40,14 +65,16 @@ func initSys() {
 		{
 			Rules: []string{"raw ^重启$"},
 			Admin: true,
-			Handle: func(_ im.Sender) interface{} {
+			Handle: func(s im.Sender) interface{} {
+				s.Disappear()
 				Daemon()
 				return nil
 			},
 		},
 		{
 			Rules: []string{"raw ^命令$"},
-			Handle: func(_ im.Sender) interface{} {
+			Handle: func(s im.Sender) interface{} {
+				s.Disappear()
 				ss := []string{}
 				for _, f := range functions {
 					ss = append(ss, strings.Join(f.Rules, " "))
@@ -59,6 +86,7 @@ func initSys() {
 			Admin: true,
 			Rules: []string{"set ? ? ?"},
 			Handle: func(s im.Sender) interface{} {
+				s.Disappear()
 				b := Bucket(s.Get(0))
 				if !IsBucket(b) {
 					return errors.New("不存在的存储桶")
@@ -71,6 +99,7 @@ func initSys() {
 			Admin: true,
 			Rules: []string{"delete ? ?"},
 			Handle: func(s im.Sender) interface{} {
+				s.Disappear()
 				b := Bucket(s.Get(0))
 				if !IsBucket(b) {
 					return errors.New("不存在的存储桶")
@@ -83,6 +112,7 @@ func initSys() {
 			Admin: true,
 			Rules: []string{"get ? ?"},
 			Handle: func(s im.Sender) interface{} {
+				s.Disappear()
 				b := Bucket(s.Get(0))
 				if !IsBucket(b) {
 					return errors.New("不存在的存储桶")
