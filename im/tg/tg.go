@@ -137,11 +137,15 @@ func (sender *Sender) IsMedia() bool {
 func (sender *Sender) Reply(msgs ...interface{}) (int, error) {
 	msg := msgs[0]
 	var edit *core.Edit
+	var replace *core.Replace
 	for _, item := range msgs {
 		switch item.(type) {
 		case core.Edit:
 			v := item.(core.Edit)
 			edit = &v
+		case core.Replace:
+			v := item.(core.Replace)
+			replace = &v
 		case time.Duration:
 			du := item.(time.Duration)
 			sender.Duration = &du
@@ -166,8 +170,24 @@ func (sender *Sender) Reply(msgs ...interface{}) (int, error) {
 		rt, err = b.Send(r, string(msg.([]byte)), options...)
 	case string:
 		if edit != nil && sender.reply != nil {
-			b.Edit(sender.reply, msg.(string))
+			if *edit == 0 {
+				if sender.reply != nil {
+					b.Edit(sender.reply, msg.(string))
+				}
+			} else {
+				b.Edit(&tb.Message{
+					ID: int(*edit),
+				}, msg.(string))
+			}
+			if sender.reply == nil {
+				return 0, nil
+			}
 			return sender.reply.ID, nil
+		}
+		if replace != nil {
+			b.Delete(&tb.Message{
+				ID: int(*edit),
+			})
 		}
 		rt, err = b.Send(r, msg.(string), options...)
 	case *http.Response:
@@ -188,8 +208,13 @@ func (sender *Sender) Reply(msgs ...interface{}) (int, error) {
 			b.Delete(rt)
 		}
 	}
-	sender.reply = rt
-	return sender.reply.ID, err
+	if rt != nil && sender.reply == nil {
+		sender.reply = rt
+	}
+	if sender.reply != nil {
+		return sender.reply.ID, err
+	}
+	return 0, nil
 }
 
 func (sender *Sender) Delete() error {
