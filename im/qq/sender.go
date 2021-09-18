@@ -149,8 +149,15 @@ func (sender *Sender) IsMedia() bool {
 	return false
 }
 
-func (sender *Sender) Reply(msgs ...interface{}) error {
+func (sender *Sender) Reply(msgs ...interface{}) (int, error) {
 	msg := msgs[0]
+	for _, item := range msgs {
+		switch item.(type) {
+		case time.Duration:
+			du := item.(time.Duration)
+			sender.Duration = &du
+		}
+	}
 	switch sender.Message.(type) {
 	case *message.PrivateMessage:
 		m := sender.Message.(*message.PrivateMessage)
@@ -203,15 +210,22 @@ func (sender *Sender) Reply(msgs ...interface{}) error {
 			id = bot.SendGroupMessage(m.GroupCode, &message.SendingMessage{Elements: []message.IMessageElement{&message.AtElement{Target: m.Sender.Uin}, &message.TextElement{Content: content}}})
 		}
 		if id > 0 && sender.Duration != nil {
-			go func() {
-				time.Sleep(*sender.Duration)
+			if *sender.Duration != 0 {
+				go func() {
+					time.Sleep(*sender.Duration)
+					sender.Delete()
+					MSG := bot.GetMessage(id)
+					bot.Client.RecallGroupMessage(m.GroupCode, MSG["message-id"].(int32), MSG["internal-id"].(int32))
+				}()
+			} else {
 				sender.Delete()
 				MSG := bot.GetMessage(id)
 				bot.Client.RecallGroupMessage(m.GroupCode, MSG["message-id"].(int32), MSG["internal-id"].(int32))
-			}()
+			}
+
 		}
 	}
-	return nil
+	return 0, nil
 }
 
 func (sender *Sender) Delete() error {
