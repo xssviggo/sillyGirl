@@ -36,6 +36,7 @@ func init() {
 		}
 		var err error
 		b, err = tb.NewBot(tb.Settings{
+			URL:    tg.Get("url"),
 			Token:  token,
 			Poller: &tb.LongPoller{Timeout: 10 * time.Second},
 		})
@@ -232,4 +233,8 @@ func (sender *Sender) Disappear(lifetime ...time.Duration) {
 	} else {
 		sender.Duration = &lifetime[0]
 	}
+}
+
+func (sender *Sender) Finish() {
+
 }

@@ -15,16 +15,19 @@ func init() {
 			vv := strings.Split(v, " ")
 			tp, cd, ud := vv[0], Int(vv[1]), Int(vv[2])
 			msg := "重启完成。"
-			if cd == 0 {
-				Push(tp, ud, msg)
-			} else {
-				for i := 0; i < 10; i++ {
+			for i := 0; i < 10; i++ {
+				if cd == 0 {
+					if push, ok := Pushs[tp]; ok {
+						push(ud, msg)
+						break
+					}
+				} else {
 					if push, ok := GroupPushs[tp]; ok {
 						push(cd, ud, msg)
 						break
 					}
-					time.Sleep(time.Second)
 				}
+				time.Sleep(time.Second)
 			}
 			sillyGirl.Set("rebootInfo", "")
 		}
@@ -89,7 +92,10 @@ func initSys() {
 				s.Reply("编译程序完毕。", E)
 				sillyGirl.Set("rebootInfo", fmt.Sprintf("%v %v %v", s.GetImType(), s.GetChatID(), s.GetUserID()))
 				s.Reply("更新完成，即将重启！", E)
-				Daemon()
+				go func() {
+					time.Sleep(time.Second)
+					Daemon()
+				}()
 				return nil
 			},
 		},
@@ -155,6 +161,20 @@ func initSys() {
 					return errors.New("空值")
 				}
 				return v
+			},
+		},
+		{
+			Admin: true,
+			Rules: []string{"send ? ? ?"},
+			Handle: func(s Sender) interface{} {
+				Push(s.Get(0), Int(s.Get(1)), s.Get(2))
+				return "发送成功呢"
+			},
+		},
+		{
+			Rules: []string{"raw ^myuid$"},
+			Handle: func(s Sender) interface{} {
+				return fmt.Sprint(s.GetUserID())
 			},
 		},
 	})
