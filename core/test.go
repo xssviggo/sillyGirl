@@ -14,6 +14,10 @@ func init() {
 		if v != "" {
 			vv := strings.Split(v, " ")
 			tp, cd, ud := vv[0], Int(vv[1]), Int(vv[2])
+			// if tp == "fake" {
+			// 	NotifyMasters("自动更新完成。")
+			// 	return
+			// }
 			msg := "重启完成。"
 			for i := 0; i < 10; i++ {
 				if cd == 0 {
@@ -45,7 +49,7 @@ func initSys() {
 		},
 		{
 			Rules: []string{"raw ^升级$"},
-			Cron:  "41 * * * *",
+			Cron:  "*/1 * * * *",
 			Admin: true,
 			Handle: func(s Sender) interface{} {
 				s.Reply("开始检查核心更新...", E)
