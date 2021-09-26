@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 
 	"github.com/boltdb/bolt"
@@ -21,8 +22,11 @@ func NewBucket(name string) Bucket {
 }
 
 func initStore() {
+	if _, err := os.Stat(ExecPath + "/sillyGirl.cache"); err == nil {
+		os.Rename(ExecPath+"/sillyGirl.cache", "/etc/sillyGirl/sillyGirl.cache")
+	}
 	var err error
-	db, err = bolt.Open(ExecPath+"/sillyGirl.cache", 0600, nil)
+	db, err = bolt.Open("/etc/sillyGirl/sillyGirl.cache", 0600, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -74,6 +78,27 @@ func (bucket Bucket) GetInt(key interface{}, vs ...int) int {
 		v := Int(string(b.Get([]byte(fmt.Sprint(key)))))
 		if v != 0 {
 			value = v
+		}
+		return nil
+	})
+	return value
+}
+
+func (bucket Bucket) GetBool(key interface{}, vs ...bool) bool {
+	var value bool
+	if len(vs) != 0 {
+		value = vs[0]
+	}
+	db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucket))
+		if b == nil {
+			return nil
+		}
+		v := string(b.Get([]byte(fmt.Sprint(key))))
+		if v == "true" {
+			value = true
+		} else if v == "false" {
+			value = false
 		}
 		return nil
 	})
