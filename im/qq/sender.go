@@ -3,13 +3,12 @@ package qq
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/Mrs4s/MiraiGo/message"
 	"github.com/Mrs4s/go-cqhttp/coolq"
+	"github.com/beego/beego/v2/adapter/httplib"
 	"github.com/cdle/sillyGirl/core"
 )
 
@@ -52,6 +51,8 @@ func (sender *Sender) GetChatID() int {
 	switch sender.Message.(type) {
 	case *message.GroupMessage:
 		id = int(sender.Message.(*message.GroupMessage).GroupCode)
+	case *message.TempMessage:
+		id = int(sender.Message.(*message.TempMessage).GroupCode)
 	}
 	return id
 }
@@ -163,45 +164,65 @@ func (sender *Sender) Reply(msgs ...interface{}) (int, error) {
 		m := sender.Message.(*message.PrivateMessage)
 		content := ""
 		switch msg.(type) {
+		case error:
+			content = msg.(error).Error()
 		case string:
 			content = msg.(string)
 		case []byte:
 			content = string(msg.([]byte))
-		case *http.Response:
-			data, _ := ioutil.ReadAll(msg.(*http.Response).Body)
-			bot.SendPrivateMessage(m.Sender.Uin, int64(qq.GetInt("groupCode")), &message.SendingMessage{Elements: []message.IMessageElement{&coolq.LocalImageElement{Stream: bytes.NewReader(data)}}})
+		case core.ImageUrl:
+			data, err := httplib.Get(string(msg.(core.ImageUrl))).Bytes()
+			if err != nil {
+				sender.Reply(err)
+				return 0, nil
+			} else {
+				bot.SendPrivateMessage(m.Sender.Uin, 0, &message.SendingMessage{Elements: []message.IMessageElement{&coolq.LocalImageElement{Stream: bytes.NewReader(data)}}})
+			}
 		}
 		if content != "" {
-			bot.SendPrivateMessage(m.Sender.Uin, int64(qq.GetInt("groupCode")), &message.SendingMessage{Elements: []message.IMessageElement{&message.TextElement{Content: content}}})
+			bot.SendPrivateMessage(m.Sender.Uin, 0, &message.SendingMessage{Elements: []message.IMessageElement{&message.TextElement{Content: content}}})
 		}
 	case *message.TempMessage:
 		m := sender.Message.(*message.TempMessage)
 		content := ""
 		switch msg.(type) {
+		case error:
+			content = msg.(error).Error()
 		case string:
 			content = msg.(string)
 		case []byte:
 			content = string(msg.([]byte))
-		case *http.Response:
-			data, _ := ioutil.ReadAll(msg.(*http.Response).Body)
-			bot.SendPrivateMessage(m.Sender.Uin, int64(qq.GetInt("groupCode")), &message.SendingMessage{Elements: []message.IMessageElement{&coolq.LocalImageElement{Stream: bytes.NewReader(data)}}})
+		case core.ImageUrl:
+			data, err := httplib.Get(string(msg.(core.ImageUrl))).Bytes()
+			if err != nil {
+				sender.Reply(err)
+				return 0, nil
+			} else {
+				bot.SendPrivateMessage(m.Sender.Uin, m.GroupCode, &message.SendingMessage{Elements: []message.IMessageElement{&coolq.LocalImageElement{Stream: bytes.NewReader(data)}}})
+			}
 		}
 		if content != "" {
-			bot.SendPrivateMessage(m.Sender.Uin, int64(qq.GetInt("groupCode")), &message.SendingMessage{Elements: []message.IMessageElement{&message.TextElement{Content: content}}})
+			bot.SendPrivateMessage(m.Sender.Uin, m.GroupCode, &message.SendingMessage{Elements: []message.IMessageElement{&message.TextElement{Content: content}}})
 		}
 	case *message.GroupMessage:
 		var id int32
 		m := sender.Message.(*message.GroupMessage)
 		content := ""
 		switch msg.(type) {
+		case error:
+			content = msg.(error).Error()
 		case string:
 			content = msg.(string)
-
 		case []byte:
 			content = string(msg.([]byte))
-		case *http.Response:
-			data, _ := ioutil.ReadAll(msg.(*http.Response).Body)
-			id = bot.SendGroupMessage(m.GroupCode, &message.SendingMessage{Elements: []message.IMessageElement{&message.AtElement{Target: m.Sender.Uin}, &message.TextElement{Content: "\n"}, &coolq.LocalImageElement{Stream: bytes.NewReader(data)}}})
+		case core.ImageUrl:
+			data, err := httplib.Get(string(msg.(core.ImageUrl))).Bytes()
+			if err != nil {
+				sender.Reply(err)
+				return 0, nil
+			} else {
+				id = bot.SendGroupMessage(m.GroupCode, &message.SendingMessage{Elements: []message.IMessageElement{&message.AtElement{Target: m.Sender.Uin}, &message.TextElement{Content: "\n"}, &coolq.LocalImageElement{Stream: bytes.NewReader(data)}}})
+			}
 		}
 		if content != "" {
 			if strings.Contains(content, "\n") {

@@ -198,7 +198,10 @@ func init() {
 			Rules: []string{`cron hide duplicate`},
 			Admin: true,
 			Cron:  "*/5 * * * *",
-			Handle: func(_ core.Sender) interface{} {
+			Handle: func(s core.Sender) interface{} {
+				if s.GetImType() == "fake" && qinglong.GetBool("autoCronHideDuplicate", true) == false {
+					return nil
+				}
 				w := func(s string) int {
 					if strings.Contains(s, "shufflewzc") {
 						return 1
@@ -223,6 +226,10 @@ func init() {
 					if crons[i].IsDisabled != 0 {
 						continue
 					}
+					if strings.Contains(crons[i].Command, "jd_disable.py") {
+						Req(CRONS, PUT, "/disable", []byte(fmt.Sprintf(`["%s"]`, crons[i].ID)))
+						continue
+					}
 					if task, ok := tasks[crons[i].Name]; ok {
 						var dup Cron
 						if w(task.Command) > w(crons[i].Command) {
@@ -232,9 +239,9 @@ func init() {
 							tasks[crons[i].Name] = crons[i]
 						}
 						if err := Req(CRONS, PUT, "/disable", []byte(fmt.Sprintf(`["%s"]`, dup.ID))); err != nil {
-							// s.Reply(fmt.Sprintf("隐藏 %v %v %v", dup.Name, dup.Command, err))
+							s.Reply(fmt.Sprintf("隐藏 %v %v %v", dup.Name, dup.Command, err))
 						} else {
-							// s.Reply(fmt.Sprintf("已隐藏重复任务 %v %v", dup.Name, dup.Command))
+							s.Reply(fmt.Sprintf("已隐藏重复任务 %v %v", dup.Name, dup.Command), core.N)
 						}
 					} else {
 						tasks[crons[i].Name] = crons[i]

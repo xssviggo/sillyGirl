@@ -2,8 +2,10 @@ package qq
 
 import (
 	"crypto/md5"
+	"fmt"
 	"os"
 	"path"
+	"strings"
 	"sync"
 	"time"
 
@@ -46,6 +48,7 @@ func start() {
 	conf.Account.Uin = int64(qq.GetInt("uin", 0))
 	conf.Account.Password = qq.Get("password")
 	conf.Message.ReportSelfMessage = true
+	conf.Account.ReLogin.MaxTimes = 30
 	conf.Database = map[string]yaml.Node{
 		"leveldb": {
 			Kind: 4,
@@ -224,12 +227,15 @@ func start() {
 			c.MarkPrivateMessageReaded(m.Sender.Uin, int64(m.Time))
 		}
 	}
-	onTempMessage := func(c *client.QQClient, e *client.TempMessageEvent) {
+	onTempMessage := func(_ *client.QQClient, e *client.TempMessageEvent) {
 		core.Senders <- &Sender{
 			Message: e.Message,
 		}
 	}
 	OnGroupMessage := func(_ *client.QQClient, m *message.GroupMessage) {
+		if listen := qq.Get("onGroups"); listen != "" && !strings.Contains(listen, fmt.Sprint(m.GroupCode)) {
+			return
+		}
 		core.Senders <- &Sender{
 			Message: m,
 		}
@@ -237,12 +243,20 @@ func start() {
 	bot.Client.OnPrivateMessage(onPrivateMessage)
 	bot.Client.OnGroupMessage(OnGroupMessage)
 	bot.Client.OnTempMessage(onTempMessage)
-	if qq.Get("onself", "true") == "true" {
+	if qq.GetBool("onself", true) == true {
 		bot.Client.OnSelfPrivateMessage(onPrivateMessage)
 		bot.Client.OnSelfGroupMessage(OnGroupMessage)
 	}
+
+	bot.Client.OnNewFriendRequest(func(_ *client.QQClient, request *client.NewFriendRequest) {
+		if qq.GetBool("auto_friend", false) == true {
+			time.Sleep(time.Second)
+			request.Accept()
+			core.NotifyMasters(fmt.Sprintf("QQ已同意%v的好友申请，验证信息为：%v", request.RequesterUin, request.Message))
+		}
+	})
 	core.Pushs["qq"] = func(i int, s string) {
-		bot.SendPrivateMessage(int64(i), int64(qq.GetInt("groupCode")), &message.SendingMessage{Elements: []message.IMessageElement{&message.TextElement{Content: s}}})
+		bot.SendPrivateMessage(int64(i), int64(qq.GetInt("tempMessageGroupCode")), &message.SendingMessage{Elements: []message.IMessageElement{&message.TextElement{Content: s}}})
 	}
 	core.GroupPushs["qq"] = func(i, j int, s string) {
 		bot.SendGroupMessage(int64(i), &message.SendingMessage{Elements: []message.IMessageElement{&message.AtElement{Target: int64(j)}, &message.TextElement{Content: s}}})
