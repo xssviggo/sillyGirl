@@ -8,11 +8,17 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/astaxie/beego/logs"
 )
 
+var BeforeStop = []func(){}
+
 func Daemon() {
+	for _, bs := range BeforeStop {
+		bs()
+	}
 	args := os.Args[1:]
 	execArgs := make([]string, 0)
 	l := len(args)
@@ -55,6 +61,7 @@ func CompileCode() error {
 	if err != nil {
 		return errors.New("编译失败：" + err.Error() + "。")
 	}
+	sillyGirl.Set("compiled_at", time.Now().Format("2006-01-02 15:04:05"))
 	return nil
 }
 

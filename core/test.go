@@ -105,6 +105,18 @@ func initSys() {
 			},
 		},
 		{
+			Rules: []string{"raw ^编译$"},
+			Admin: true,
+			Handle: func(s Sender) interface{} {
+				s.Reply("正在编译程序...", E)
+				if err := CompileCode(); err != nil {
+					return err
+				}
+				s.Reply("编译程序完毕。", E)
+				return nil
+			},
+		},
+		{
 			Rules: []string{"raw ^重启$"},
 			Admin: true,
 			Handle: func(s Sender) interface{} {
@@ -121,6 +133,14 @@ func initSys() {
 				s.Disappear()
 				ss := []string{}
 				for _, f := range functions {
+					// f := f
+					// for i := range f.Rules {
+					// 	f.Rules[i] = strings.Trim(f.Rules[i], "^$")
+					// 	f.Rules[i] = strings.Replace(f.Rules[i], `\s+`, " ", -1)
+					// 	f.Rules[i] = strings.Replace(f.Rules[i], `(\S+)`, "?", -1)
+					// 	f.Rules[i] = strings.Replace(f.Rules[i], `[(]`, "(", -1)
+					// 	f.Rules[i] = strings.Replace(f.Rules[i], `[)]`, ")", -1)
+					// }
 					ss = append(ss, strings.Join(f.Rules, " "))
 				}
 				return strings.Join(ss, "\n")
@@ -180,6 +200,24 @@ func initSys() {
 			Rules: []string{"raw ^myuid$"},
 			Handle: func(s Sender) interface{} {
 				return fmt.Sprint(s.GetUserID())
+			},
+		},
+		{
+			Rules: []string{"raw ^groupCode$"},
+			Handle: func(s Sender) interface{} {
+				return fmt.Sprintf("%d", s.GetChatID())
+			},
+		},
+		{
+			Rules: []string{"raw ^compiled_at$"},
+			Handle: func(s Sender) interface{} {
+				return sillyGirl.Get("compiled_at")
+			},
+		},
+		{
+			Rules: []string{"raw ^started_at$"},
+			Handle: func(s Sender) interface{} {
+				return sillyGirl.Get("started_at")
 			},
 		},
 	})

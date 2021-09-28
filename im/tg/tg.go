@@ -2,10 +2,10 @@ package tg
 
 import (
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
+	"github.com/astaxie/beego/httplib"
 	"github.com/beego/beego/v2/core/logs"
 	"github.com/cdle/sillyGirl/core"
 	tb "gopkg.in/tucnak/telebot.v2"
@@ -22,6 +22,11 @@ type Sender struct {
 var tg = core.NewBucket("tg")
 var b *tb.Bot
 var Handler = func(message *tb.Message) {
+	if message.FromGroup() {
+		if groupCode := tg.GetInt("groupCode"); groupCode != 0 && groupCode != int(message.Chat.ID) {
+			return
+		}
+	}
 	core.Senders <- &Sender{
 		Message: message,
 	}
@@ -191,10 +196,16 @@ func (sender *Sender) Reply(msgs ...interface{}) (int, error) {
 			})
 		}
 		rt, err = b.Send(r, msg.(string), options...)
-	case *http.Response:
-		rts, err := b.SendAlbum(r, tb.Album{&tb.Photo{File: tb.FromReader(msg.(*http.Response).Body)}}, options...)
-		if err == nil {
-			rt = &rts[0]
+	case core.ImageUrl:
+		rsp, err := httplib.Get(string(msg.(core.ImageUrl))).Response()
+		if err != nil {
+			sender.Reply(err)
+			return 0, nil
+		} else {
+			rts, err := b.SendAlbum(r, tb.Album{&tb.Photo{File: tb.FromReader(rsp.Body)}}, options...)
+			if err == nil {
+				rt = &rts[0]
+			}
 		}
 	}
 	if err != nil {
