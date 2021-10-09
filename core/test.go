@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
+	"os/exec"
 	"strings"
 	"time"
 )
@@ -11,12 +13,13 @@ import (
 func init() {
 	go func() {
 		v := sillyGirl.Get("rebootInfo")
+		defer sillyGirl.Set("rebootInfo", "")
 		if v != "" {
 			vv := strings.Split(v, " ")
 			tp, cd, ud := vv[0], Int(vv[1]), Int(vv[2])
-			if tp == "fake" && sillyGirl.GetBool("update_notify", false) == true { //
-				time.Sleep(time.Second * 10)
-				NotifyMasters("自动更新完成。")
+			if tp == "fake" { //&& sillyGirl.GetBool("update_notify", false) == true { //
+				// time.Sleep(time.Second * 10)
+				// NotifyMasters("自动更新完成。")
 				return
 			}
 			msg := "重启完成。"
@@ -34,7 +37,6 @@ func init() {
 				}
 				time.Sleep(time.Second)
 			}
-			sillyGirl.Set("rebootInfo", "")
 		}
 	}()
 }
@@ -53,6 +55,9 @@ func initSys() {
 			Cron:  "*/1 * * * *",
 			Admin: true,
 			Handle: func(s Sender) interface{} {
+				if s.GetImType() == "fake" && !sillyGirl.GetBool("auto_update", true) {
+					return nil
+				}
 				s.Reply("开始检查核心更新...", E)
 				update := false
 				record := func(b bool) {
@@ -72,7 +77,7 @@ func initSys() {
 				}
 				files, _ := ioutil.ReadDir(ExecPath + "/develop")
 				for _, f := range files {
-					if f.IsDir() {
+					if f.IsDir() && f.Name() != "replies" {
 						s.Reply("检查扩展"+f.Name()+"更新...", E)
 						need, err := GitPull("/develop/" + f.Name())
 						if err != nil {
@@ -129,6 +134,7 @@ func initSys() {
 		},
 		{
 			Rules: []string{"raw ^命令$"},
+			Admin: true,
 			Handle: func(s Sender) interface{} {
 				s.Disappear()
 				ss := []string{}
@@ -218,6 +224,37 @@ func initSys() {
 			Rules: []string{"raw ^started_at$"},
 			Handle: func(s Sender) interface{} {
 				return sillyGirl.Get("started_at")
+			},
+		},
+		{
+			Rules: []string{"^守护傻妞"},
+			Handle: func(s Sender) interface{} {
+				service := `
+[Service]
+Type=forking
+ExecStart=` + ExecPath + "/" + pname + ` -d
+PIDFile=/var/run/` + pname + `.pid
+Restart=always
+User=root
+Group=root
+				
+[Install]
+WantedBy=multi-user.target
+Alias=sillyGirl.service`
+				data, err := exec.Command("sh", "-c", "type systemctl").Output()
+				if err != nil {
+					s.Reply(err)
+					return nil
+				}
+
+				if !strings.Contains(string(data), "bin") {
+					s.Reply(data)
+					return nil
+				}
+				os.WriteFile("/usr/lib/systemd/system/sillyGirl.service", []byte(service), 0o644)
+				exec.Command("systemctl", "disable", string(sillyGirl)).Output()
+				exec.Command("systemctl", "enable", string(sillyGirl)).Output()
+				return "电脑重启后生效。"
 			},
 		},
 	})

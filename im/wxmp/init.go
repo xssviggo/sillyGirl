@@ -65,7 +65,7 @@ func init() {
 				}
 			}
 			mediaID := ""
-			if url != "" {
+			if url != "" && len(ss) == 0 {
 				filename := file_dir + fmt.Sprint(time.Now().UnixNano()) + ".jpg"
 				err := func() error {
 					f, err := os.Create(filename)
@@ -110,17 +110,18 @@ type Sender struct {
 	Responses []interface{}
 	Wait      chan []interface{}
 	uid       int
+	goon      bool
 }
 
 func (sender *Sender) GetContent() string {
 	return sender.Message
 }
 
-func (sender *Sender) GetUserID() int {
+func (sender *Sender) GetUserID() interface{} {
 	return sender.uid
 }
 
-func (sender *Sender) GetChatID() int {
+func (sender *Sender) GetChatID() interface{} {
 	return 0
 }
 
@@ -203,4 +204,12 @@ func (sender *Sender) Finish() {
 		sender.Responses = []interface{}{}
 	}
 	sender.Wait <- sender.Responses
+}
+
+func (sender *Sender) Continue() {
+	sender.goon = true
+}
+
+func (sender *Sender) IsContinue() bool {
+	return sender.goon
 }

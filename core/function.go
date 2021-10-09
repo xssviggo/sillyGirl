@@ -24,7 +24,7 @@ type Function struct {
 	Cron    string
 }
 
-var pname = regexp.MustCompile(`/([^/\s]+)`).FindStringSubmatch(os.Args[0])[1]
+var pname = regexp.MustCompile(`/([^/\s]+)$`).FindStringSubmatch(os.Args[0])[1]
 
 var name = func() string {
 	return sillyGirl.Get("name", "傻妞")
@@ -50,11 +50,16 @@ func AddCommand(prefix string, cmds []Function) {
 				cmds[j].Rules[i] = strings.Replace(cmds[j].Rules[i], "raw ", "", -1)
 				continue
 			}
+			if strings.Contains(cmds[j].Rules[i], "$") {
+				continue
+			}
 			if prefix != "" {
 				cmds[j].Rules[i] = prefix + `\s+` + cmds[j].Rules[i]
 			}
+
 			cmds[j].Rules[i] = strings.Replace(cmds[j].Rules[i], "(", `[(]`, -1)
 			cmds[j].Rules[i] = strings.Replace(cmds[j].Rules[i], ")", `[)]`, -1)
+			cmds[j].Rules[i] = regexp.MustCompile(`\?$`).ReplaceAllString(cmds[j].Rules[i], `(.+)`)
 			cmds[j].Rules[i] = strings.Replace(cmds[j].Rules[i], " ", `\s+`, -1)
 			cmds[j].Rules[i] = strings.Replace(cmds[j].Rules[i], "?", `(\S+)`, -1)
 			cmds[j].Rules[i] = "^" + cmds[j].Rules[i] + "$"
@@ -74,6 +79,7 @@ func AddCommand(prefix string, cmds []Function) {
 }
 
 func handleMessage(sender Sender) {
+	defer sender.Finish()
 	for _, function := range functions {
 		for _, rule := range function.Rules {
 			var matched bool
@@ -94,7 +100,11 @@ func handleMessage(sender Sender) {
 			}
 			if matched {
 				if function.Admin && !sender.IsAdmin() {
-					sender.Reply("没有权限操作")
+					sender.Delete()
+					sender.Disappear()
+					if sender.GetImType() != "wx" && sender.GetImType() != "qq" {
+						sender.Reply("没有权限操作")
+					}
 					sender.Finish()
 					return
 				}
@@ -102,10 +112,13 @@ func handleMessage(sender Sender) {
 				if rt != nil {
 					sender.Reply(rt)
 				}
-				sender.Finish()
+				if sender.IsContinue() {
+					goto goon
+				}
 				return
 			}
 		}
+	goon:
 	}
 }
 
