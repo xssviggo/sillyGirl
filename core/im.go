@@ -5,8 +5,8 @@ import (
 )
 
 type Sender interface {
-	GetUserID() int
-	GetChatID() int
+	GetUserID() interface{}
+	GetChatID() interface{}
 	GetImType() string
 	GetMessageID() int
 	GetUsername() string
@@ -25,34 +25,38 @@ type Sender interface {
 	Delete() error
 	Disappear(lifetime ...time.Duration)
 	Finish()
+	Continue()
+	IsContinue() bool
 }
 
 type Edit int
 type Replace int
 type Notify int
+type Article []string
 
 var E Edit
 var R Replace
 var N Notify
 
 type ImageUrl string
+type ImagePath string
 
 type Faker struct {
 	Message string
 	matches [][]string
 	Type    string
-	UserID  int
+	UserID  interface{}
 }
 
 func (sender *Faker) GetContent() string {
 	return sender.Message
 }
 
-func (sender *Faker) GetUserID() int {
+func (sender *Faker) GetUserID() interface{} {
 	return sender.UserID
 }
 
-func (sender *Faker) GetChatID() int {
+func (sender *Faker) GetChatID() interface{} {
 	return 0
 }
 
@@ -150,4 +154,12 @@ func (sender *Faker) Disappear(lifetime ...time.Duration) {
 
 func (sender *Faker) Finish() {
 
+}
+
+func (sender *Faker) Continue() {
+
+}
+
+func (sender *Faker) IsContinue() bool {
+	return true
 }

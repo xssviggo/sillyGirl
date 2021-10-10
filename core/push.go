@@ -1,9 +1,14 @@
 package core
 
-import "regexp"
+import (
+	"regexp"
+	"strings"
 
-var Pushs = map[string]func(int, string){}
-var GroupPushs = map[string]func(int, int, string){}
+	"github.com/beego/beego/v2/adapter/httplib"
+)
+
+var Pushs = map[string]func(interface{}, string){}
+var GroupPushs = map[string]func(interface{}, interface{}, string){}
 
 func Push(class string, uid int, content string) {
 	if push, ok := Pushs[class]; ok {
@@ -31,15 +36,24 @@ func (ct *Chat) Push(content interface{}) {
 }
 
 func NotifyMasters(content string) {
-	for _, class := range []string{"tg", "qq"} {
-		notify := Bucket(class).Get("notifiers")
-		if notify == "" {
-			notify = Bucket(class).Get("masters")
+	go func() {
+		content = strings.Trim(content, " ")
+		if sillyGirl.GetBool("ignore_notify", false) == true {
+			return
 		}
-		for _, v := range regexp.MustCompile(`(\d+)`).FindAllStringSubmatch(notify, -1) {
-			if push, ok := Pushs[class]; ok {
-				push(Int(v[1]), content)
+		if token := sillyGirl.Get("pushplus"); token != "" {
+			httplib.Get("http://www.pushplus.plus/send?token=" + token + "&title=0101010&content=" + content + "&template=html")
+		}
+		for _, class := range []string{"tg", "qq"} {
+			notify := Bucket(class).Get("notifiers")
+			if notify == "" {
+				notify = Bucket(class).Get("masters")
+			}
+			for _, v := range regexp.MustCompile(`(\d+)`).FindAllStringSubmatch(notify, -1) {
+				if push, ok := Pushs[class]; ok {
+					push(Int(v[1]), content)
+				}
 			}
 		}
-	}
+	}()
 }
