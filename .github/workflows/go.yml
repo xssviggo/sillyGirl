@@ -22,7 +22,6 @@ jobs:
       run: |
            git clone https://github.com/892947707/jd_cookie.git develop/jd_cookie
            go build
-           ls
 
     - name: Upload firmware to cowtransfer
       id: cowtransfer
@@ -31,11 +30,3 @@ jobs:
         ./transfer cow --block 2621440 -s -p 64 --no-progress sillyGirl 2>&1 | tee cowtransfer.log
         echo "::warning file=cowtransfer.com::$(cat cowtransfer.log | grep https)"
         echo "::set-output name=url::$(cat cowtransfer.log | grep https | cut -f3 -d" ")"
-
-    - name: Upload firmware to WeTransfer
-      id: wetransfer
-      run: |
-        curl -fsSL git.io/file-transfer | sh
-        ./transfer wet -s -p 16 --no-progress sillyGirl 2>&1 | tee wetransfer.log
-        echo "::warning file=wetransfer.com::$(cat wetransfer.log | grep https)"
-        echo "::set-output name=url::$(cat wetransfer.log | grep https | cut -f3 -d" ")"
