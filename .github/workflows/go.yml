@@ -22,6 +22,7 @@ jobs:
       run: |
            git clone https://github.com/892947707/jd_cookie.git develop/jd_cookie
            go build
+           ls
 
     - name: Upload firmware to cowtransfer
       id: cowtransfer
