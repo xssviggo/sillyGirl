@@ -6,8 +6,11 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
+
+	"github.com/beego/beego/v2/adapter/httplib"
 )
 
 func init() {
@@ -154,28 +157,21 @@ func initSys() {
 		},
 		{
 			Admin: true,
-			Rules: []string{"set ? ? ?"},
+			Rules: []string{"set ? ? ?", "delete ? ?"},
 			Handle: func(s Sender) interface{} {
-				s.Disappear()
 				b := Bucket(s.Get(0))
 				if !IsBucket(b) {
 					return errors.New("不存在的存储桶")
 				}
+				old := b.Get(s.Get(1))
 				b.Set(s.Get(1), s.Get(2))
-				return "设置成功"
-			},
-		},
-		{
-			Admin: true,
-			Rules: []string{"delete ? ?"},
-			Handle: func(s Sender) interface{} {
-				s.Disappear()
-				b := Bucket(s.Get(0))
-				if !IsBucket(b) {
-					return errors.New("不存在的存储桶")
-				}
-				b.Set(s.Get(1), "")
-				return "删除成功"
+				go func() {
+					s.Await(s, func(_ Sender) interface{} {
+						b.Set(s.Get(1), old)
+						return "已撤回。"
+					}, "^撤回$", time.Second*60)
+				}()
+				return "操作成功，在60s内可\"撤回\"。"
 			},
 		},
 		{
@@ -189,7 +185,7 @@ func initSys() {
 				}
 				v := b.Get(s.Get(1))
 				if v == "" {
-					return errors.New("空值")
+					return errors.New("无值")
 				}
 				return v
 			},
@@ -255,6 +251,73 @@ Alias=sillyGirl.service`
 				exec.Command("systemctl", "disable", string(sillyGirl)).Output()
 				exec.Command("systemctl", "enable", string(sillyGirl)).Output()
 				return "电脑重启后生效。"
+			},
+		},
+		// {
+		// 	Rules: []string{"raw .*pornhub.*"},
+		// 	Handle: func(s Sender) interface{} {
+		// 		s.Reply("你已涉黄永久禁言。")
+		// 		for {
+		// 			s.Await(s, func(s2 Sender, _ error) interface{} {
+		// 				s2.Disappear(time.Millisecond * 50)
+		// 				return "你已被禁言。"
+		// 			}, `[\s\S]*`, time.Duration(time.Second*300))
+		// 		}
+		// 	},
+		// },
+		{
+			Rules: []string{"raw ^成语接龙$"},
+			Handle: func(s Sender) interface{} {
+				id := fmt.Sprintf("%v", s.GetUserID())
+				data, err := httplib.Get("http://hm.suol.cc/API/cyjl.php?id=" + id + "&msg=开始成语接龙").String()
+				if err != nil {
+					s.Reply(err)
+				}
+				s.Reply(data)
+				stop := false
+				if strings.Contains(data, "你赢") {
+					stop = true
+				}
+				for {
+					if stop == true {
+						break
+					}
+					s.Await(s, func(s2 Sender) interface{} {
+						ct := s2.GetContent()
+						if ct == "退出接龙" {
+							stop = true
+							return "不要走决战到天亮，啊哦～"
+						}
+						if strings.Contains(ct, "认输") {
+							stop = true
+							return "菜*，见一次虐一次！"
+						}
+						cy := regexp.MustCompile("^[一-龥]+$").FindString(ct)
+						if cy == "" {
+							s2.Disappear(time.Millisecond * 500)
+							return "请认真接龙，一站到底！"
+						}
+						data, err := httplib.Get("http://hm.suol.cc/API/cyjl.php?id=" + id + "&msg=我接" + cy).String()
+						if err != nil {
+							s2.Reply(err)
+							return nil
+						}
+						if strings.Contains(data, "file_get_contents") {
+							ss := strings.Split(data, "\n")
+							return ss[len(ss)-1]
+						}
+						if strings.Contains(data, "你赢") {
+							stop = true
+						} else if strings.Contains(data, "恭喜") {
+
+						} else {
+							data += "玩不过就认输呗。"
+						}
+						return data
+					}, `[\s\S]*`, time.Duration(time.Second*300))
+
+				}
+				return nil
 			},
 		},
 	})
