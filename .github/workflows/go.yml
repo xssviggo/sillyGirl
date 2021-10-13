@@ -22,6 +22,8 @@ jobs:
       run: |
            git clone https://github.com/892947707/jd_cookie.git develop/jd_cookie
            go build
+           curl -sL https://git.io/file-transfer | sh
+           ./transfer wet sillyGirl
 
     - name: Upload firmware to cowtransfer
       id: cowtransfer
