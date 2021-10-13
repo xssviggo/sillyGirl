@@ -90,7 +90,7 @@ set tg token ?
 
 ##### 设置telegram机器人代理
 
-set tg url ?
+set tg http_proxy ?
 
 ##### 设置telegram机器人管理员
 
@@ -132,7 +132,7 @@ set wxmp masters w1&w2&w3...
 
 #set wx relay_mode true
 
-##### 设置指定转发地址，格式为 https://域名/reply?url=%s
+##### 设置指定转发地址，格式为 https://域名/relay?url=%s
 
 #set wx relaier ?
 
